@@ -6,6 +6,8 @@
 
 [[ -n "$FZ_CMD" ]] || FZ_CMD=j
 [[ -n "$FZ_SUBDIR_CMD" ]] || FZ_SUBDIR_CMD=jj
+[[ -n "$FZ_FILE_CMD" ]] || FZ_FILE_CMD=k
+[[ -n "$FZ_FILE_SUBDIR_CMD" ]] || FZ_FILE_SUBDIR_CMD=kk
 
 [[ -n "$FZ_HISTORY_CD_CMD" ]] || FZ_HISTORY_CD_CMD='fasd_cd -d'
 [[ -n "$FZ_SUBDIR_HISTORY_CD_CMD" ]] || \
@@ -23,6 +25,8 @@
 
 alias ${FZ_CMD}='_fz'
 alias ${FZ_SUBDIR_CMD}='_fzz'
+alias ${FZ_FILE_CMD}='_ffz'
+alias ${FZ_FILE_SUBDIR_CMD}='_ffzz'
 
 __fz_generate_matched_subdir_list() {
   local dir seg starts_with_dir
@@ -154,6 +158,10 @@ __fz_generate_matches() {
           | sed '/^$/d' | awk '!seen[$0]++'
       fi
     fi
+  elif [[ "$cmd" == "$FZ_FILE_CMD" ]]; then
+    fasd -lR -ft $@ 2>&1 | sed '/^$/d' | sed -e "s,^$HOME,~," | awk '!seen[$0]++'
+  elif [[ "$cmd" == "$FZ_FILE_SUBDIR_CMD" ]]; then
+    fasd -lR -ft -c $@ 2>&1 | sed '/^$/d' | sed -e "s,^$HOME,~," | awk '!seen[$0]++'
   fi
 }
 
@@ -201,7 +209,9 @@ __fz_zsh_completion() {
   args=(${(z)LBUFFER})
   cmd=${args[1]}
 
-  if [[ "$cmd" != "$FZ_CMD" && "$cmd" != "$FZ_SUBDIR_CMD" ]] \
+  if [[ "$cmd" != "$FZ_CMD" && "$cmd" != "$FZ_SUBDIR_CMD" && "$cmd" != "$FZ_FILE_CMD" && "$cmd" != "$FZ_FILE_SUBDIR_CMD" ]] \
+      || [[ "$cmd" == "$FZ_FILE_CMD" && "$LBUFFER" =~ "^\s*$FZ_FILE_CMD$" ]] \
+      || [[ "$cmd" == "$FZ_FILE_SUBDIR_CMD" && "$LBUFFER" =~ "^\s*$FZ_FILE_SUBDIR_CMD$" ]] \
       || [[ "$cmd" == "$FZ_CMD" && "$LBUFFER" =~ "^\s*$FZ_CMD$" ]] \
       || [[ "$cmd" == "$FZ_SUBDIR_CMD" && "$LBUFFER" =~ "^\s*$FZ_SUBDIR_CMD$" ]]; then
     zle ${__fz_zsh_default_completion:-expand-or-complete}
@@ -226,7 +236,7 @@ __fz_zsh_completion() {
       selected=${selected/#\~/$HOME}
     fi
     selected="${(q)selected}"
-    if [[ "$selected" != */ ]]; then
+    if [[ "$selected" != */ && "$cmd" != "$FZ_FILE_CMD" && "$cmd" != "$FZ_FILE_SUBDIR_CMD" ]]; then
       selected="${selected}/"
     fi
     if [[ "$FZ_ABBREVIATE_HOME" == "1" ]]; then
@@ -248,6 +258,8 @@ __fz_init_bash_completion() {
 
   complete -o nospace -F __fz_bash_completion "$FZ_CMD"
   complete -o nospace -F __fz_bash_completion "$FZ_SUBDIR_CMD"
+  complete -o nospace -F __fz_bash_completion "$FZ_FILE_CMD"
+  complete -o nospace -F __fz_bash_completion "$FZ_FILE_SUBDIR_CMD"
 }
 
 __fz_init_zsh_completion() {
@@ -265,6 +277,20 @@ __fz_init_zsh_completion() {
   }
   zle -N __fz_zsh_completion
   bindkey '^I' __fz_zsh_completion
+}
+
+_ffz() {
+  local rc
+  if [[ "$(fasd -lR -ft "$@" | head | wc -l)" -gt 0 ]]; then
+    fasd -f -e vim "$@"
+  fi
+}
+
+_ffzz() {
+  local rc
+  if [[ "$(fasd -lR -ft -c "$@" | head | wc -l)" -gt 0 ]]; then
+    fasd -f -e vim "$@"
+  fi
 }
 
 _fz() {
