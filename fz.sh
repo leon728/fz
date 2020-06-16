@@ -4,13 +4,14 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-[[ -n "$FZ_CMD" ]] || FZ_CMD=z
-[[ -n "$FZ_SUBDIR_CMD" ]] || FZ_SUBDIR_CMD=zz
+[[ -n "$FZ_CMD" ]] || FZ_CMD=j
+[[ -n "$FZ_SUBDIR_CMD" ]] || FZ_SUBDIR_CMD=jj
 
-[[ -n "$FZ_HISTORY_CD_CMD" ]] || FZ_HISTORY_CD_CMD=_z
+[[ -n "$FZ_HISTORY_CD_CMD" ]] || FZ_HISTORY_CD_CMD='fasd_cd -d'
 [[ -n "$FZ_SUBDIR_HISTORY_CD_CMD" ]] || \
 	FZ_SUBDIR_HISTORY_CD_CMD="$FZ_HISTORY_CD_CMD -c"
 
+[[ -n "$FZ_HISTORY_LIST_PARAMETER" ]] || FZ_HISTORY_LIST_PARAMETER='-dt'
 [[ -n "$FZ_HISTORY_LIST_GENERATOR" ]] \
   || FZ_HISTORY_LIST_GENERATOR=__fz_generate_matched_history_list
 [[ -n "$FZ_SUBDIR_HISTORY_LIST_GENERATOR" ]] \
@@ -95,11 +96,7 @@ __fz_generate_matched_subdir_list() {
 }
 
 __fz_generate_matched_history_list() {
-  "$FZ_HISTORY_CD_CMD" -l $@ 2>&1 | while read -r line; do
-    if [[ "$line" == common:* ]]; then continue; fi
-    # Reverse the order and cut off the scores
-    echo "$line"
-  done | sed '1!G;h;$!d' | cut -b 12-
+  fasd -lR $FZ_HISTORY_LIST_PARAMETER $@ 2>&1
 }
 
 __fz_generate_matched_subdir_history_list() {
@@ -107,7 +104,7 @@ __fz_generate_matched_subdir_history_list() {
 }
 
 __fz_generate_matches() {
-  local cmd histories subdirs
+  local cmd subdirs
 
   if [[ -n "$BASH_VERSION" ]]; then
     cmd=$([[ "${COMP_WORDS[0]}" =~ [[:space:]]*([^[:space:]]|[^[:space:]].*[^[:space:]])[[:space:]]* ]]; \
@@ -138,7 +135,6 @@ __fz_generate_matches() {
       fi
     fi
   elif [[ "$cmd" == "$FZ_SUBDIR_CMD" ]]; then
-    histories=$("$FZ_SUBDIR_HISTORY_LIST_GENERATOR" "$@")
     if [[ "$FZ_ABBREVIATE_HOME" == "1" ]]; then
       if [ "$FZ_SUBDIR_TRAVERSAL" == "1" ]; then
         cat <("$FZ_SUBDIR_HISTORY_LIST_GENERATOR" "$@") \
@@ -172,10 +168,11 @@ __fz_bash_completion() {
   local selected slug
   eval "slug=${COMP_WORDS[@]:(-1)}"
 
-  if [[ "$(__fz_generate_matches "$slug" | head | wc -l)" -gt 1 ]]; then
-    selected=$(__fz_generate_matches "$slug" | __fz_filter)
-  elif [[ "$(__fz_generate_matches "$slug" | head | wc -l)" -eq 1 ]]; then
-    selected=$(__fz_generate_matches "$slug")
+  matches=$(__fz_generate_matches "$slug")
+  if [[ "$(echo ${matches} | head | wc -l)" -gt 1 ]]; then
+    selected=$(echo ${matches} | __fz_filter)
+  elif [[ "$(echo ${matches} | head | wc -l)" -eq 1 ]]; then
+    selected=${matches}
   else
     return
   fi
@@ -215,10 +212,11 @@ __fz_zsh_completion() {
     eval "slug=${args[-1]}"
   fi
 
-  if [[ "$(__fz_generate_matches "$slug" | head | wc -l)" -gt 1 ]]; then
-    selected=$(__fz_generate_matches "$slug" | __fz_filter)
-  elif [[ "$(__fz_generate_matches "$slug" | head | wc -l)" -eq 1 ]]; then
-    selected=$(__fz_generate_matches "$slug")
+  matches=$(__fz_generate_matches "$slug")
+  if [[ "$(echo ${matches} | head | wc -l)" -gt 1 ]]; then
+    selected=$(echo ${matches} | __fz_filter)
+  elif [[ "$(echo ${matches} | head | wc -l)" -eq 1 ]]; then
+    selected=${matches}
   else
     return
   fi
@@ -272,7 +270,7 @@ __fz_init_zsh_completion() {
 _fz() {
   local rc
   if [[ "$($FZ_HISTORY_LIST_GENERATOR "$@" | head | wc -l)" -gt 0 ]]; then
-    "$FZ_HISTORY_CD_CMD" "$@"
+    $FZ_HISTORY_CD_CMD "$@"
   elif [[ "$FZ_SUBDIR_TRAVERSAL" -ne 0 ]]; then
     err=$(cd "${@: -1}" 2>&1)
     rc=$?
