@@ -118,50 +118,31 @@ __fz_generate_matches() {
     cmd=${cmd[1]}
   fi
 
+	local abbr_home="cat"
+	if [[ "$FZ_ABBREVIATE_HOME" == "1" ]]; then abbr_home=(sed -e "s,^$HOME,~,"); fi
+
   if [[ "$cmd" == "$FZ_CMD" ]]; then
-    if [[ "$FZ_ABBREVIATE_HOME" == "1" ]]; then
-      if [ "$FZ_SUBDIR_TRAVERSAL" == "1" ]; then
-        cat <("$FZ_HISTORY_LIST_GENERATOR" "$@") \
-          <(__fz_generate_matched_subdir_list "$@") \
-          | sed '/^$/d' | sed -e "s,^$HOME,~," | awk '!seen[$0]++'
-      else
-        cat <("$FZ_HISTORY_LIST_GENERATOR" "$@") \
-          | sed '/^$/d' | sed -e "s,^$HOME,~," | awk '!seen[$0]++'
-      fi
+    if [ "$FZ_SUBDIR_TRAVERSAL" == "1" ]; then
+      cat <("$FZ_HISTORY_LIST_GENERATOR" "$@") \
+        <(__fz_generate_matched_subdir_list "$@") \
+        | sed '/^$/d' | $abbr_home | awk '!seen[$0]++'
     else
-      if [ "$FZ_SUBDIR_TRAVERSAL" == "1" ]; then
-        cat <("$FZ_HISTORY_LIST_GENERATOR" "$@") \
-          <(__fz_generate_matched_subdir_list "$@") \
-          | sed '/^$/d' | awk '!seen[$0]++'
-      else
-        cat <("$FZ_HISTORY_LIST_GENERATOR" "$@") \
-          | sed '/^$/d' | awk '!seen[$0]++'
-      fi
+      cat <("$FZ_HISTORY_LIST_GENERATOR" "$@") \
+        | sed '/^$/d' | $abbr_home | awk '!seen[$0]++'
     fi
   elif [[ "$cmd" == "$FZ_SUBDIR_CMD" ]]; then
-    if [[ "$FZ_ABBREVIATE_HOME" == "1" ]]; then
-      if [ "$FZ_SUBDIR_TRAVERSAL" == "1" ]; then
-        cat <("$FZ_SUBDIR_HISTORY_LIST_GENERATOR" "$@") \
-          <(__fz_generate_matched_subdir_list "$@") \
-          | sed '/^$/d' | sed -e "s,^$HOME,~," | awk '!seen[$0]++'
-      else
-        cat <("$FZ_SUBDIR_HISTORY_LIST_GENERATOR" "$@") \
-          | sed '/^$/d' | sed -e "s,^$HOME,~," | awk '!seen[$0]++'
-      fi
+    if [ "$FZ_SUBDIR_TRAVERSAL" == "1" ]; then
+      cat <("$FZ_SUBDIR_HISTORY_LIST_GENERATOR" "$@") \
+        <(__fz_generate_matched_subdir_list "$@") \
+        | sed '/^$/d' | $abbr_home | awk '!seen[$0]++'
     else
-      if [ "$FZ_SUBDIR_TRAVERSAL" == "1" ]; then
-        cat <("$FZ_SUBDIR_HISTORY_LIST_GENERATOR" "$@") \
-          <(__fz_generate_matched_subdir_list "$@") \
-          | sed '/^$/d' | awk '!seen[$0]++'
-      else
-        cat <("$FZ_SUBDIR_HISTORY_LIST_GENERATOR" "$@") \
-          | sed '/^$/d' | awk '!seen[$0]++'
-      fi
+      cat <("$FZ_SUBDIR_HISTORY_LIST_GENERATOR" "$@") \
+        | sed '/^$/d' | $abbr_home | awk '!seen[$0]++'
     fi
   elif [[ "$cmd" == "$FZ_FILE_CMD" ]]; then
-    fasd -lR -ft $@ 2>&1 | sed '/^$/d' | sed -e "s,^$HOME,~," | awk '!seen[$0]++'
+    fasd -lR -ft $@ 2>&1 | sed '/^$/d' | $abbr_home | awk '!seen[$0]++'
   elif [[ "$cmd" == "$FZ_FILE_SUBDIR_CMD" ]]; then
-    fasd -lR -ft -c $@ 2>&1 | sed '/^$/d' | sed -e "s,^$HOME,~," | awk '!seen[$0]++'
+    fasd -lR -ft -c $@ 2>&1 | sed '/^$/d' | $abbr_home | awk '!seen[$0]++'
   fi
 }
 
@@ -202,6 +183,11 @@ __fz_bash_completion() {
   printf '\e[5n'
 }
 
+__fz_shift() {
+  shift
+  echo $@
+}
+
 __fz_zsh_completion() {
   setopt localoptions noshwordsplit noksh_arrays noposixbuiltins nonomatch
   local args cmd selected slug
@@ -219,7 +205,9 @@ __fz_zsh_completion() {
   fi
 
   if [[ "${#args}" -gt 1 ]]; then
-    eval "slug=${args[-1]}"
+    #eval "slug=${args[-1]}"
+    slug=$(__fz_shift $args)
+    #slug=($(__fz_shift $args))
   fi
 
   matches=$(__fz_generate_matches "$slug")
